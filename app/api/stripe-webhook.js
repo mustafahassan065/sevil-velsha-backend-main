@@ -1,5 +1,5 @@
 // api/stripe-webhook.js
-// Payment complete hone par sirf Resend se welcome email bhejta hai
+// Payment complete → welcome email + course access data save
 
 import Stripe from 'stripe';
 import { Resend } from 'resend';
@@ -25,18 +25,19 @@ export default async function handler(req, res) {
 
   if (event.type === 'checkout.session.completed') {
     const session      = event.data.object;
+    const sessionId    = session.id;
     const email        = session.customer_details?.email;
     const name         = session.customer_details?.name || 'Student';
     const firstName    = name.split(' ')[0];
-    const dashboardUrl = 'https://sevilvelsha.com/voice-control-dashboard';
+    const dashboardUrl = `https://sevilvelsha.com/voice-control-dashboard?session_id=${sessionId}`;
 
     if (!email) {
       return res.status(200).json({ received: true });
     }
 
-    console.log(`✅ Payment confirmed: ${email}`);
+    console.log(`✅ Payment confirmed: ${email} | Session: ${sessionId}`);
 
-    // ── RESEND — welcome email ────────────────────────────────────
+    // ── RESEND — welcome email with session_id in URL ────────────────
     try {
       const { error } = await resend.emails.send({
         from:    'Sevil Velsha <onboarding@resend.dev>',
@@ -119,7 +120,7 @@ function buildWelcomeEmail(firstName, dashboardUrl) {
           </table>
 
           <p style="margin:0;font-size:13px;color:#aaa;text-align:center;">
-            Or copy: <a href="${dashboardUrl}" style="color:#c9a96e;">${dashboardUrl}</a>
+            🔒 This is your personal access link — save it for future access from any device.
           </p>
         </td>
       </tr>
@@ -129,7 +130,7 @@ function buildWelcomeEmail(firstName, dashboardUrl) {
       <tr>
         <td style="padding:24px 48px 32px;text-align:center;">
           <p style="margin:0;font-size:12px;color:#aaa;">
-            Questions? Contact <strong style="color:#c9a96e;">sevilvelsha.com</strong>
+            Questions? Contact <strong style="color:#c9a96e;">info@sevilvelsha.com</strong>
           </p>
         </td>
       </tr>
