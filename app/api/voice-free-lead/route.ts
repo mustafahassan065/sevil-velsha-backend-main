@@ -5,6 +5,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FREE_URL   = 'https://sevilvelsha.com/voice-free-access';
@@ -16,7 +26,7 @@ export async function POST(req: NextRequest) {
     const { name, email, source } = await req.json();
 
     if (!name || !email || !email.includes('@')) {
-      return NextResponse.json({ error: 'Name and email required.' }, { status: 400 });
+      return NextResponse.json({ error: 'Name and email required.' }, { status: 400, headers: corsHeaders });
     }
 
     const firstName  = name.split(' ')[0];
@@ -129,10 +139,10 @@ export async function POST(req: NextRequest) {
         </div>`,
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: corsHeaders });
 
   } catch (err) {
     console.error('voice-free-lead error:', err);
-    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500, headers: corsHeaders });
   }
 }
