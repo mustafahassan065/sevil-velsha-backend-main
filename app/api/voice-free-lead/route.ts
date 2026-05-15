@@ -15,13 +15,15 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Resend init handled per-request using env vars (same as contact route)
 
 const FREE_URL   = 'https://sevilvelsha.com/voice-free-access';
 const PDF_URL    = 'https://sevilvelsha.com/voice-control-pdf';
 const COURSE_URL = 'https://sevilvelsha.com/voice-control-course';
 
 export async function POST(req: NextRequest) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   try {
     const { name, email, source } = await req.json();
 
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // ── 1. Welcome email → user ──────────────────────────────────
     await resend.emails.send({
-      from:    'Sevil Velsha <onboarding@resend.dev>',
+      from:    `Sevil Velsha <${process.env.RESEND_SENDER_EMAIL}>`,
       to:      email,
       subject: isPdf
         ? '📄 Your Free Voice Control PDF is Ready'
@@ -115,8 +117,8 @@ export async function POST(req: NextRequest) {
 
     // ── 2. Notification → info@sevilvelsha.com ───────────────────
     await resend.emails.send({
-      from:    'Sevil Velsha <onboarding@resend.dev>',
-      to:      'info@sevilvelsha.com',
+      from:    `Sevil Velsha <${process.env.RESEND_SENDER_EMAIL}>`,
+      to:      process.env.CONTACT_RECIPIENT_EMAIL || 'info@sevilvelsha.com',
       subject: `New Lead — ${name} (${sourceName})`,
       html: `
         <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#fff;border:1px solid #eee;border-radius:8px;">
