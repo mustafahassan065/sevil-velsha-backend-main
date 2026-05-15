@@ -1,9 +1,8 @@
-// api/voice-free-lead.js
-// Backend repo mein rakho — same folder jahan apply.js ya contact.js hai
-// Kaam: free lead capture (free video page + free PDF page) par form submit hone par
-// 1. User ko welcome email bhejna
-// 2. info@sevilvelsha.com ko notification bhejna
+// app/api/voice-free-lead/route.ts
+// Next.js App Router format
+// Backend repo mein: app/api/voice-free-lead/route.ts
 
+import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -12,29 +11,24 @@ const FREE_URL   = 'https://sevilvelsha.com/voice-free-access';
 const PDF_URL    = 'https://sevilvelsha.com/voice-control-pdf';
 const COURSE_URL = 'https://sevilvelsha.com/voice-control-course';
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const { name, email, source } = req.body;
-
-  if (!name || !email || !email.includes('@')) {
-    return res.status(400).json({ error: 'Name and email required.' });
-  }
-
-  const firstName  = name.split(' ')[0];
-  const sourceName = source === 'pdf_lead' ? 'PDF Guide Page' : 'Free Video Page';
-  const accessUrl  = source === 'pdf_lead' ? PDF_URL : FREE_URL;
-
-  // ── 1. Welcome email → user ────────────────────────────────────
+export async function POST(req: NextRequest) {
   try {
+    const { name, email, source } = await req.json();
+
+    if (!name || !email || !email.includes('@')) {
+      return NextResponse.json({ error: 'Name and email required.' }, { status: 400 });
+    }
+
+    const firstName  = name.split(' ')[0];
+    const isPdf      = source === 'pdf_lead';
+    const sourceName = isPdf ? 'PDF Guide Page' : 'Free Video Page';
+    const accessUrl  = isPdf ? PDF_URL : FREE_URL;
+
+    // ── 1. Welcome email → user ──────────────────────────────────
     await resend.emails.send({
       from:    'Sevil Velsha <onboarding@resend.dev>',
       to:      email,
-      subject: source === 'pdf_lead'
+      subject: isPdf
         ? '📄 Your Free Voice Control PDF is Ready'
         : '🎤 Your Free Voice Control Training is Ready',
       html: `
@@ -49,7 +43,7 @@ export default async function handler(req, res) {
     <td style="background:linear-gradient(135deg,#1a1a1a,#2d2d2d,#4a3728);padding:40px 48px;text-align:center;">
       <p style="margin:0 0 8px;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:#c9a96e;font-weight:600;">Sevil Velsha</p>
       <h1 style="margin:0;font-size:24px;font-weight:700;color:#fff;">
-        ${source === 'pdf_lead' ? '📄 Your Free PDF is Ready' : '🎤 Your Free Training is Ready'}
+        ${isPdf ? '📄 Your Free PDF is Ready' : '🎤 Your Free Training is Ready'}
       </h1>
     </td>
   </tr>
@@ -59,12 +53,12 @@ export default async function handler(req, res) {
       <p style="margin:0 0 16px;font-size:16px;color:#1a1a1a;font-weight:600;">Dear ${firstName},</p>
       <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.7;">
         Thank you for taking the first step. Your free Voice Control
-        ${source === 'pdf_lead' ? 'PDF guide' : 'training'} is ready to access now.
+        ${isPdf ? 'PDF guide' : 'training'} is ready to access now.
       </p>
       <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
         <tr>
           <td style="background:#f8f6f2;border-left:4px solid #c9a96e;border-radius:8px;padding:20px 24px;">
-            ${source === 'pdf_lead' ? `
+            ${isPdf ? `
             <p style="margin:0 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#c9a96e;">Free PDF Guide</p>
             <p style="margin:0;font-size:15px;font-weight:700;color:#1a1a1a;">5 Voice Mistakes That Make People Ignore You</p>
             ` : `
@@ -79,7 +73,7 @@ export default async function handler(req, res) {
         <tr><td align="center">
           <a href="${accessUrl}"
             style="display:inline-block;background:linear-gradient(135deg,#c9a96e,#e8d5a3);color:#1a1a1a;font-weight:700;font-size:14px;padding:16px 48px;border-radius:50px;text-decoration:none;">
-            ${source === 'pdf_lead' ? '📄 Access Your PDF Now' : '🎯 Watch Free Lesson Now'}
+            ${isPdf ? '📄 Access Your PDF Now' : '🎯 Watch Free Lesson Now'}
           </a>
         </td></tr>
       </table>
@@ -108,13 +102,8 @@ export default async function handler(req, res) {
 </table>
 </body></html>`,
     });
-    console.log(`✅ Welcome email sent to ${email}`);
-  } catch (err) {
-    console.error('Welcome email error:', err);
-  }
 
-  // ── 2. Notification → info@sevilvelsha.com ─────────────────────
-  try {
+    // ── 2. Notification → info@sevilvelsha.com ───────────────────
     await resend.emails.send({
       from:    'Sevil Velsha <onboarding@resend.dev>',
       to:      'info@sevilvelsha.com',
@@ -139,10 +128,11 @@ export default async function handler(req, res) {
           </table>
         </div>`,
     });
-    console.log(`✅ Notification sent to info@sevilvelsha.com`);
-  } catch (err) {
-    console.error('Notification email error:', err);
-  }
 
-  return res.status(200).json({ success: true });
+    return NextResponse.json({ success: true });
+
+  } catch (err) {
+    console.error('voice-free-lead error:', err);
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
+  }
 }
