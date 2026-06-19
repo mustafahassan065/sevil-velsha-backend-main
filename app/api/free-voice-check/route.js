@@ -1,5 +1,5 @@
 // app/api/free-voice-check/route.js
-// Receives name + email + 30-sec audio from FreeVoiceCheckPage
+// Receives name + email + audio recording from FreeVoiceCheckPage
 // Emails admin (with attachment) + confirmation to customer via Resend
 //
 // Add to backend repo at: app/api/free-voice-check/route.js
