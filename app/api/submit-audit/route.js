@@ -1,21 +1,13 @@
 // app/api/submit-audit/route.js
-// Receives email + audio file from the Thank You page,
-// emails the admin (with attachment) and confirms to the customer.
-//
-// Add to your repo at: app/api/submit-audit/route.js
-//
-// Required dependency: nodemailer
-//   npm install nodemailer
-//
-// Required env vars (add in Vercel → Project → Settings → Environment Variables):
-//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, ADMIN_EMAIL
-//   STRIPE_SECRET_KEY (optional, to verify session_id)
+// Receives email + audio file from the Thank You page.
+// Emails admin (with attachment) + confirms to customer via Resend.
+// Uses existing env vars: RESEND_API_KEY, RESEND_SENDER_EMAIL, CONTACT_RECIPIENT_EMAIL
+// Optional: STRIPE_SECRET_KEY (to verify payment session)
 
-import nodemailer from 'nodemailer';
-import Stripe from 'stripe';
+import { Resend } from 'resend';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // tighten to your frontend domain in production
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
@@ -27,9 +19,9 @@ export async function OPTIONS() {
 export async function POST(req) {
   try {
     const formData = await req.formData();
-    const email = formData.get('email');
+    const email     = formData.get('email');
     const sessionId = formData.get('sessionId');
-    const file = formData.get('audio');
+    const file      = formData.get('audio');
 
     if (!email || !file) {
       return Response.json(
@@ -41,6 +33,7 @@ export async function POST(req) {
     // Optional: verify Stripe session was actually paid
     if (sessionId && process.env.STRIPE_SECRET_KEY) {
       try {
+        const { default: Stripe } = await import('stripe');
         const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
         const session = await stripe.checkout.sessions.retrieve(sessionId);
         if (session.payment_status !== 'paid') {
@@ -51,38 +44,25 @@ export async function POST(req) {
       }
     }
 
-    // Convert file (Blob) to Buffer for the email attachment
+    // Convert file to base64 for Resend attachment
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
-    // Email to admin with attachment
-    await transporter.sendMail({
-      from: `"Voice Audit" <${process.env.SMTP_USER}>`,
-      to: process.env.ADMIN_EMAIL,
+    // 1) Admin email with recording attached
+    await resend.emails.send({
+      from: process.env.RESEND_SENDER_EMAIL,
+      to:   process.env.CONTACT_RECIPIENT_EMAIL,
       subject: `New Voice Audit Submission — ${email}`,
       text: `New submission received.\n\nCustomer email: ${email}\nStripe session: ${sessionId || 'N/A'}\n\nRecording attached.`,
-      attachments: [
-        {
-          filename: file.name || 'recording',
-          content: buffer,
-        },
-      ],
+      attachments: [{ filename: file.name || 'recording', content: base64 }],
     });
 
-    // Confirmation email to customer
-    await transporter.sendMail({
-      from: `"Sevil Velsha — Voice Audit" <${process.env.SMTP_USER}>`,
-      to: email,
+    // 2) Confirmation to customer
+    await resend.emails.send({
+      from: process.env.RESEND_SENDER_EMAIL,
+      to:   email,
       subject: 'Your Voice Audit has been received',
       text: `Hi,\n\nYour Voice Audit has been received. You will receive your personalized video feedback within 24 hours.\n\nThanks,\nSevil Velsha`,
     });
